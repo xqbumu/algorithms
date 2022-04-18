@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// https://leetcode-cn.com/problems/next-permutation/
+// [TODO] https://leetcode-cn.com/problems/next-permutation/
 func nextPermutation(nums []int) {
 
 }
@@ -20,6 +20,7 @@ func Test_nextPermutation(t *testing.T) {
 		want []int
 	}{
 		{``, args{[]int{1, 2, 3}}, []int{1, 3, 2}},
+		{``, args{[]int{2, 3, 1}}, []int{3, 1, 2}},
 		{``, args{[]int{3, 2, 1}}, []int{1, 2, 3}},
 		{``, args{[]int{1, 1, 5}}, []int{1, 5, 1}},
 	}
