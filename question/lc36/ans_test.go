@@ -41,11 +41,11 @@ func checkBlock(nums ...byte) bool {
 		if nums[i] == '.' {
 			continue
 		}
-		if bits&(1<<(nums[i]-'0')) != 0 {
+		if bits&(1<<(nums[i]-'1')) != 0 {
 			printBlock(nums...)
 			return false
 		}
-		bits |= 1 << (nums[i] - '0')
+		bits |= 1 << (nums[i] - '1')
 	}
 
 	return true
