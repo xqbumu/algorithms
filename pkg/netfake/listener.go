@@ -7,7 +7,7 @@ type Listener struct {
 	name string
 }
 
-func NewListener(ln net.Listener, name string) net.Listener {
+func NewListener(name string, ln net.Listener) net.Listener {
 	return &Listener{ln, name}
 }
 
