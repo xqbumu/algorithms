@@ -4,10 +4,11 @@ import "net"
 
 type Listener struct {
 	net.Listener
+	name string
 }
 
-func NewListener(ln net.Listener) net.Listener {
-	return &Listener{ln}
+func NewListener(ln net.Listener, name string) net.Listener {
+	return &Listener{ln, name}
 }
 
 func (ln Listener) Accept() (net.Conn, error) {
@@ -16,5 +17,5 @@ func (ln Listener) Accept() (net.Conn, error) {
 		return nil, err
 	}
 
-	return &Conn{conn}, err
+	return NewConn(ln.name, conn), err
 }

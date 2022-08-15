@@ -1,7 +1,8 @@
 package netfake
 
 import (
-	"encoding/hex"
+	"bytes"
+	"fmt"
 	"log"
 	"net"
 )
@@ -10,27 +11,35 @@ import (
 // Refer: crypto/tls/common.go
 type Conn struct {
 	net.Conn
+	name  string
+	count int
+}
+
+func NewConn(name string, conn net.Conn) net.Conn {
+	return &Conn{conn, name, 0}
 }
 
 // Read implements the Conn Read method.
 func (c *Conn) Read(b []byte) (int, error) {
+	c.count++
 	n, err := c.Conn.Read(b)
 	switch b[0] {
 	case 22: // recordTypeHandshake
-		log.Printf("Read: %d, Len: %d\n, Content: %s", b[0], len(b), hex.EncodeToString(b))
+		c.printf("Read: %d, Len: %d\n, Content: %s", b[0], len(b), bytes2hex(b))
 	default:
-		log.Printf("Read: %d, Len: %d, Content: %s\n", b[0], len(b), string(b))
+		c.printf("Read: %d, Len: %d, Content: %s\n", b[0], len(b), bytes2hex(b))
 	}
 	return n, err
 }
 
 // Write implements the Conn Write method.
 func (c *Conn) Write(b []byte) (int, error) {
+	c.count++
 	switch b[0] {
 	case 22: // recordTypeHandshake, now the cipher is nil
 		var vers uint16 = uint16(b[1])<<8 | uint16(b[2])
 		if VersionTLS10 == vers {
-			log.Printf("Vers: %d\n", vers)
+			c.printf("Vers: %d\n", vers)
 			msg := &clientHelloMsg{}
 			if ok := msg.unmarshal(b[5:]); !ok { // skip metadata
 				panic("can not unmarshal msg")
@@ -44,10 +53,32 @@ func (c *Conn) Write(b []byte) (int, error) {
 			record[4] = byte(m)
 			b = append(record, data...)
 		}
-		log.Printf("Write: %d, Len: %d\n", b[0], len(b))
+		c.printf("Write: %d, Len: %d\n", b[0], len(b))
 	default:
-		log.Printf("Write: %d, Len: %d\n", b[0], len(b))
+		c.printf("Write: %d, Len: %d\n", b[0], len(b))
 	}
 
 	return c.Conn.Write(b)
+}
+
+func (c *Conn) printf(format string, v ...any) {
+	prefix := fmt.Sprintf("[%s:%d]", c.name, c.count)
+	log.Output(2, fmt.Sprintf(prefix+format, v...))
+}
+
+func bytes2hex(b []byte) string {
+	bs := append([]byte{}, b...)
+	bs = bytes.TrimRight(bs, string([]byte{0}))
+	// for bs[len(bs)-1] != '0' {
+	// 	bs = bs[0 : len(bs)-1]
+	// }
+	buf := bytes.NewBuffer([]byte{})
+	for k, v := range bs {
+		if k%32 == 0 {
+			fmt.Fprintf(buf, "\n0x%03X..0x%03X: ", k, k)
+		}
+		fmt.Fprintf(buf, " 0x%02X", v)
+	}
+
+	return buf.String()
 }

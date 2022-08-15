@@ -2,6 +2,7 @@ package netfake
 
 import (
 	"context"
+	"crypto/tls"
 	"net"
 	"net/http"
 	"time"
@@ -15,6 +16,7 @@ func NewTransport() http.RoundTripper {
 			KeepAlive: 30 * time.Second,
 		}),
 		ForceAttemptHTTP2:     true,
+		TLSClientConfig:       &tls.Config{InsecureSkipVerify: true},
 		MaxIdleConns:          100,
 		IdleConnTimeout:       90 * time.Second,
 		TLSHandshakeTimeout:   10 * time.Second,
@@ -25,6 +27,6 @@ func NewTransport() http.RoundTripper {
 func defaultTransportDialContext(dialer *net.Dialer) func(context.Context, string, string) (net.Conn, error) {
 	return func(ctx context.Context, network string, address string) (net.Conn, error) {
 		conn, err := dialer.DialContext(ctx, network, address)
-		return &Conn{conn}, err
+		return NewConn("client", conn), err
 	}
 }
