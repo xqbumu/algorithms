@@ -4211,6 +4211,7 @@ type fingerPrintFrames struct {
 
 func newFingerPrintFrames() *fingerPrintFrames {
 	return &fingerPrintFrames{
+		windowUpdate: "00",
 		priority: make([]string, 0, 5),
 	}
 }
@@ -4251,7 +4252,11 @@ func (fpf fingerPrintFrames) String() string {
 	buf.WriteByte('|')
 	buf.WriteString(fpf.windowUpdate)
 	buf.WriteByte('|')
-	buf.WriteString(strings.Join(fpf.priority, ","))
+	if len(fpf.priority) == 0 {
+		buf.WriteByte('0')
+	} else {
+		buf.WriteString(strings.Join(fpf.priority, ","))
+	}
 	
 	return buf.String()
 }
