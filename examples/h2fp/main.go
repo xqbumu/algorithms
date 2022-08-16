@@ -2,6 +2,7 @@ package main
 
 import (
 	"algorithms/assets"
+	"algorithms/pkg/httpfake"
 	"algorithms/pkg/netfake"
 	"crypto/tls"
 	"html/template"
@@ -50,7 +51,7 @@ func runHttp(r http.Handler) http.Server {
 	return server
 }
 
-func runHttps(r http.Handler) *http.Server {
+func runHttps(r http.Handler) *httpfake.Server {
 	certFile, err := assets.FS.ReadFile("certs/_wildcard.example.arpa.pem")
 	if err != nil {
 		panic(err)
@@ -67,11 +68,13 @@ func runHttps(r http.Handler) *http.Server {
 		panic(err)
 	}
 
-	server := &http.Server{
+	server := &httpfake.Server{
 		ReadTimeout:  time.Second * 300,
 		WriteTimeout: time.Second * 300,
-		Handler:      r,
-		TLSConfig:    cfg,
+		Handler: httpfake.HandlerFunc(func(rw httpfake.ResponseWriter, req *httpfake.Request) {
+			r.ServeHTTP(httpfake.StdResponseWriter(rw), httpfake.StdRequest(req))
+		}),
+		TLSConfig: cfg,
 	}
 
 	ln, err := net.Listen("tcp", ":8443")

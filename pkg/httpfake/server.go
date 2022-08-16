@@ -7,13 +7,13 @@
 package httpfake
 
 import (
+	"algorithms/pkg/godebug"
 	"bufio"
 	"bytes"
 	"context"
 	"crypto/tls"
 	"errors"
 	"fmt"
-	"internal/godebug"
 	"io"
 	"log"
 	"math/rand"

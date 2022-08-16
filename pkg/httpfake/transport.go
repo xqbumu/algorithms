@@ -10,6 +10,7 @@
 package httpfake
 
 import (
+	"algorithms/pkg/godebug"
 	"algorithms/pkg/httpfake/internal/ascii"
 	"bufio"
 	"compress/gzip"
@@ -18,7 +19,6 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
-	"internal/godebug"
 	"io"
 	"log"
 	"net"

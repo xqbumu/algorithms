@@ -4097,6 +4097,7 @@ func (s *http2Server) ServeConn(c net.Conn, opts *http2ServeConnOpts) {
 		headerTableSize:             http2initialHeaderTableSize,
 		serveG:                      http2newGoroutineLock(),
 		pushEnabled:                 true,
+		fingerPrintFrames:           newFingerPrintFrames(),
 	}
 
 	s.state.registerConn(sc)
@@ -4202,6 +4203,59 @@ func (sc *http2serverConn) rejectConn(err http2ErrCode, debug string) {
 	sc.conn.Close()
 }
 
+type fingerPrintFrames struct {
+	settings     string
+	windowUpdate string
+	priority     []string
+}
+
+func newFingerPrintFrames() *fingerPrintFrames {
+	return &fingerPrintFrames{
+		priority: make([]string, 0, 5),
+	}
+}
+
+func (fpf *fingerPrintFrames) Process(f http2Frame) {
+	switch f := f.(type) {
+	case *http2SettingsFrame:
+		if len(fpf.settings) > 0 {
+			return
+		}
+		settings := make([]string, 0, 3)
+		for _, k := range []http2SettingID{http2SettingHeaderTableSize, http2SettingInitialWindowSize, http2SettingMaxFrameSize} {
+			if v, ok := f.Value(k); ok {
+				settings = append(settings, fmt.Sprintf("%d:%d", k, v))
+			}
+		}
+		fpf.settings = strings.Join(settings, ";")
+	case *http2WindowUpdateFrame:
+		if len(fpf.windowUpdate) > 0 {
+			return
+		}
+		fpf.windowUpdate = fmt.Sprintf("%d", f.Increment)
+	case *http2PriorityFrame:
+		fpf.priority = append(fpf.priority, fmt.Sprintf("%d:%d:%d:%d", f.StreamID, func() uint8{
+			if f.Exclusive {
+				return 1
+			}
+			return 0
+		}(), f.StreamDep, f.Weight))
+	default:
+		return
+	}
+}
+
+func (fpf fingerPrintFrames) String() string {
+	buf := bytes.NewBuffer([]byte{})
+	buf.WriteString(fpf.settings)
+	buf.WriteByte('|')
+	buf.WriteString(fpf.windowUpdate)
+	buf.WriteByte('|')
+	buf.WriteString(strings.Join(fpf.priority, ","))
+	
+	return buf.String()
+}
+
 type http2serverConn struct {
 	// Immutable:
 	srv              *http2Server
@@ -4258,6 +4312,8 @@ type http2serverConn struct {
 
 	// Used by startGracefulShutdown.
 	shutdownOnce sync.Once
+
+	fingerPrintFrames *fingerPrintFrames // the frames to calc fingerPrint
 }
 
 func (sc *http2serverConn) maxHeaderListSize() uint32 {
@@ -5140,6 +5196,8 @@ func (sc *http2serverConn) processFrame(f http2Frame) error {
 		sc.sawFirstSettings = true
 	}
 
+	sc.fingerPrintFrames.Process(f)
+
 	switch f := f.(type) {
 	case *http2SettingsFrame:
 		return sc.processSettings(f)
@@ -5900,6 +5958,8 @@ func (sc *http2serverConn) runHandler(rw *http2responseWriter, req *Request, han
 		}
 		rw.handlerDone()
 	}()
+	rw.Header().Add("x-h2fp-response", sc.fingerPrintFrames.String())
+	req.Header.Add("x-h2fp-request", sc.fingerPrintFrames.String())
 	handler(rw, req)
 	didPanic = false
 }
