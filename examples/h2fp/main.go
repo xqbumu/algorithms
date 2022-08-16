@@ -50,7 +50,7 @@ func runHttp(r http.Handler) http.Server {
 	return server
 }
 
-func runHttps(r http.Handler) http.Server {
+func runHttps(r http.Handler) *http.Server {
 	certFile, err := assets.FS.ReadFile("certs/_wildcard.example.arpa.pem")
 	if err != nil {
 		panic(err)
@@ -67,7 +67,7 @@ func runHttps(r http.Handler) http.Server {
 		panic(err)
 	}
 
-	server := http.Server{
+	server := &http.Server{
 		ReadTimeout:  time.Second * 300,
 		WriteTimeout: time.Second * 300,
 		Handler:      r,
