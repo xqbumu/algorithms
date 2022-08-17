@@ -4097,7 +4097,7 @@ func (s *http2Server) ServeConn(c net.Conn, opts *http2ServeConnOpts) {
 		headerTableSize:             http2initialHeaderTableSize,
 		serveG:                      http2newGoroutineLock(),
 		pushEnabled:                 true,
-		fingerPrintParts:            newFingerPrintFrames(),
+		fingerPrintParts:            newFingerprintParts(),
 	}
 
 	s.state.registerConn(sc)
@@ -4203,82 +4203,6 @@ func (sc *http2serverConn) rejectConn(err http2ErrCode, debug string) {
 	sc.conn.Close()
 }
 
-type fingerPrintParts struct {
-	settings     string
-	windowUpdate string
-	priority     []string
-	metaHeaders  []byte
-}
-
-func newFingerPrintFrames() *fingerPrintParts {
-	return &fingerPrintParts{
-		windowUpdate: "00",
-		priority:     make([]string, 0, 5),
-		metaHeaders:  make([]byte, 0, 4),
-	}
-}
-
-func (fpf *fingerPrintParts) ProcessFrame(f http2Frame) {
-	switch f := f.(type) {
-	case *http2SettingsFrame:
-		if len(fpf.settings) > 0 {
-			return
-		}
-		settings := make([]string, 0, 3)
-		for _, k := range []http2SettingID{http2SettingHeaderTableSize, http2SettingInitialWindowSize, http2SettingMaxFrameSize} {
-			if v, ok := f.Value(k); ok {
-				settings = append(settings, fmt.Sprintf("%d:%d", k, v))
-			}
-		}
-		fpf.settings = strings.Join(settings, ";")
-	case *http2WindowUpdateFrame:
-		if fpf.windowUpdate != "00" {
-			return
-		}
-		fpf.windowUpdate = fmt.Sprintf("%d", f.Increment)
-	case *http2PriorityFrame:
-		fpf.priority = append(fpf.priority, fmt.Sprintf("%d:%d:%d:%d", f.StreamID, func() uint8 {
-			if f.Exclusive {
-				return 1
-			}
-			return 0
-		}(), f.StreamDep, f.Weight))
-	case *http2MetaHeadersFrame:
-		if len(fpf.metaHeaders) > 0 {
-			return
-		}
-		for _, field := range f.Fields {
-			if strings.Contains(":method:authority:scheme:path", field.Name) {
-				fpf.metaHeaders = append(fpf.metaHeaders, field.Name[1])
-			}
-		}
-	default:
-		return
-	}
-}
-
-func (fpf fingerPrintParts) String() string {
-	buf := bytes.NewBuffer([]byte{})
-	buf.WriteString(fpf.settings)
-	buf.WriteByte('|')
-	buf.WriteString(fpf.windowUpdate)
-	buf.WriteByte('|')
-	if len(fpf.priority) == 0 {
-		buf.WriteByte('0')
-	} else {
-		buf.WriteString(strings.Join(fpf.priority, ","))
-	}
-	buf.WriteByte('|')
-	for k, v := range fpf.metaHeaders {
-		buf.WriteByte(v)
-		if k < len(fpf.metaHeaders)-1 {
-			buf.WriteByte(',')
-		}
-	}
-
-	return buf.String()
-}
-
 type http2serverConn struct {
 	// Immutable:
 	srv              *http2Server
@@ -4336,7 +4260,7 @@ type http2serverConn struct {
 	// Used by startGracefulShutdown.
 	shutdownOnce sync.Once
 
-	fingerPrintParts *fingerPrintParts // the parts to calc fingerPrint
+	fingerPrintParts *fingerprintParts // the parts to calc fingerPrint
 }
 
 func (sc *http2serverConn) maxHeaderListSize() uint32 {
@@ -4681,6 +4605,8 @@ func (sc *http2serverConn) serve() {
 			if !sc.processFrameFromReader(res) {
 				return
 			}
+			// collect http/2 fingerprint infomation.
+			sc.fingerPrintParts.ProcessFrame(res)
 			res.readMore()
 			if settingsTimer != nil {
 				settingsTimer.Stop()
@@ -5221,13 +5147,10 @@ func (sc *http2serverConn) processFrame(f http2Frame) error {
 
 	switch f := f.(type) {
 	case *http2SettingsFrame:
-		sc.fingerPrintParts.ProcessFrame(f)
 		return sc.processSettings(f)
 	case *http2MetaHeadersFrame:
-		sc.fingerPrintParts.ProcessFrame(f)
 		return sc.processHeaders(f)
 	case *http2WindowUpdateFrame:
-		sc.fingerPrintParts.ProcessFrame(f)
 		return sc.processWindowUpdate(f)
 	case *http2PingFrame:
 		return sc.processPing(f)
@@ -5236,7 +5159,6 @@ func (sc *http2serverConn) processFrame(f http2Frame) error {
 	case *http2RSTStreamFrame:
 		return sc.processResetStream(f)
 	case *http2PriorityFrame:
-		sc.fingerPrintParts.ProcessFrame(f)
 		return sc.processPriority(f)
 	case *http2GoAwayFrame:
 		return sc.processGoAway(f)
