@@ -4232,7 +4232,7 @@ func (fpf *fingerPrintParts) ProcessFrame(f http2Frame) {
 		}
 		fpf.settings = strings.Join(settings, ";")
 	case *http2WindowUpdateFrame:
-		if len(fpf.windowUpdate) > 0 {
+		if fpf.windowUpdate != "00" {
 			return
 		}
 		fpf.windowUpdate = fmt.Sprintf("%d", f.Increment)
