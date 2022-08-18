@@ -4097,7 +4097,7 @@ func (s *http2Server) ServeConn(c net.Conn, opts *http2ServeConnOpts) {
 		headerTableSize:             http2initialHeaderTableSize,
 		serveG:                      http2newGoroutineLock(),
 		pushEnabled:                 true,
-		fingerPrintParts:            newFingerprintParts(),
+		fingerprintParts:            newFingerprintParts(),
 	}
 
 	s.state.registerConn(sc)
@@ -4260,7 +4260,7 @@ type http2serverConn struct {
 	// Used by startGracefulShutdown.
 	shutdownOnce sync.Once
 
-	fingerPrintParts *fingerprintParts // the parts to calc fingerPrint
+	fingerprintParts *fingerprintParts // the parts to calc fingerPrint
 }
 
 func (sc *http2serverConn) maxHeaderListSize() uint32 {
@@ -4606,7 +4606,7 @@ func (sc *http2serverConn) serve() {
 				return
 			}
 			// collect http/2 fingerprint infomation.
-			sc.fingerPrintParts.ProcessFrame(res)
+			sc.fingerprintParts.ProcessFrame(res)
 			res.readMore()
 			if settingsTimer != nil {
 				settingsTimer.Stop()
@@ -5905,8 +5905,8 @@ func (sc *http2serverConn) runHandler(rw *http2responseWriter, req *Request, han
 		}
 		rw.handlerDone()
 	}()
-	rw.Header().Add("x-h2fp-response", sc.fingerPrintParts.String())
-	req.Header.Add("x-h2fp-request", sc.fingerPrintParts.String())
+	rw.Header().Add("x-h2fp-response", sc.fingerprintParts.String())
+	req.Header.Add("x-h2fp-request", sc.fingerprintParts.String())
 	handler(rw, req)
 	didPanic = false
 }
