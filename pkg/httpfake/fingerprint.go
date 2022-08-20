@@ -109,9 +109,8 @@ func (fpp *fingerprintParts) String() string {
 	fpp.wCsv.Flush()
 
 	buf := bytes.NewBuffer([]byte{})
-	for _, sk := range []http2SettingID{
-		http2SettingHeaderTableSize, http2SettingInitialWindowSize, http2SettingMaxFrameSize,
-	} {
+	var sk http2SettingID
+	for sk = 0; sk < 6; sk++ {
 		if sv, ok := fpp.settings[sk]; ok {
 			fmt.Fprintf(buf, "%d:%d;", sk, sv)
 		}
