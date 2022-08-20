@@ -11,17 +11,15 @@ import (
 )
 
 type fingerprintParts struct {
+	// TODO: debug
 	wCsv  *csv.Writer
 	count uint
 
 	// serverConn are reused in stream and needs to prevent duplicate parsing.
-	printed      bool
-	settings     map[http2SettingID]uint32
-	windowUpdate uint32
+	printed bool
 
-	// there is no priority frame before headers frame with some browser,
-	// such as Microsoft Edge.
-	// so it could be empty.
+	settings      map[http2SettingID]uint32
+	windowUpdate  uint32
 	priorities    []string
 	pseudoHeaders []byte
 }
@@ -38,7 +36,7 @@ func newFingerprintParts() *fingerprintParts {
 
 	return &fingerprintParts{
 		wCsv: csv.NewWriter(fp),
-		// the average number of priority frame here may be 5.
+		// the average number of settings here may be 6.
 		settings: make(map[http2SettingID]uint32, 6),
 		// the average number of priority frame here may be 5.
 		priorities: make([]string, 0, 5),
@@ -48,8 +46,9 @@ func newFingerprintParts() *fingerprintParts {
 }
 
 // the readFrameResult will no longer exist if readFrames again,
-// so it is necessary to save the fingerprint information.
+// so it is necessary to save the fingerprint information with plain value.
 func (fpp *fingerprintParts) ProcessFrame(res http2readFrameResult) {
+	// TODO: debug
 	fpp.count++
 	fpp.wCsv.Write([]string{
 		fmt.Sprintf("`%d", fpp.count),
@@ -62,6 +61,7 @@ func (fpp *fingerprintParts) ProcessFrame(res http2readFrameResult) {
 		return
 	}
 
+	// if error occured, the frame will also discard by h2.
 	err := res.err
 	if err != nil {
 		return
