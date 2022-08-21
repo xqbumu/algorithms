@@ -16,6 +16,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"golang.org/x/net/http2"
+	"golang.org/x/net/http2/h2c"
 )
 
 func main() {
@@ -25,6 +27,11 @@ func main() {
 
 	go func() {
 		server := runHttps(hander)
+		defer server.Close()
+	}()
+
+	go func() {
+		server := runHttp2c(hander)
 		defer server.Close()
 	}()
 
@@ -39,7 +46,7 @@ func runHttp(r http.Handler) http.Server {
 		Handler:      r,
 	}
 
-	ln, err := net.Listen("tcp", ":8080")
+	ln, err := net.Listen("tcp", ":9080")
 	if err != nil {
 		panic(err)
 	}
@@ -49,6 +56,26 @@ func runHttp(r http.Handler) http.Server {
 	}
 
 	return server
+}
+
+func runHttp2c(r http.Handler) http.Server {
+	h2s := &http2.Server{}
+	h1s := http.Server{
+		ReadTimeout:  time.Second * 300,
+		WriteTimeout: time.Second * 300,
+		Handler:      h2c.NewHandler(r, h2s),
+	}
+
+	ln, err := net.Listen("tcp", ":9081")
+	if err != nil {
+		panic(err)
+	}
+
+	if err := h1s.Serve(netfake.NewListener("http", ln)); err != nil {
+		panic(err)
+	}
+
+	return h1s
 }
 
 func runHttps(r http.Handler) *httpfake.Server {
@@ -77,7 +104,7 @@ func runHttps(r http.Handler) *httpfake.Server {
 		TLSConfig: cfg,
 	}
 
-	ln, err := net.Listen("tcp", ":8443")
+	ln, err := net.Listen("tcp", ":9443")
 	if err != nil {
 		panic(err)
 	}
@@ -110,6 +137,9 @@ func newHander() http.Handler {
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("welcome"))
 	})
+	r.Get("/healthcheck", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("ok"))
+	})
 	r.Get("/flags", func(w http.ResponseWriter, r *http.Request) {
 		flags, err := fs.Glob(assets.FS, "static/flags/*.png")
 		if err != nil {
@@ -130,7 +160,7 @@ func newHander() http.Handler {
 }
 
 func doRequest() {
-	req, err := http.NewRequest(http.MethodGet, "https://127.0.0.1:8443", nil)
+	req, err := http.NewRequest(http.MethodGet, "https://127.0.0.1:9443", nil)
 	if err != nil {
 		panic(err)
 	}
