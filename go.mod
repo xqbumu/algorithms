@@ -5,6 +5,7 @@ go 1.19
 require (
 	github.com/cucumber/godog v0.12.5
 	github.com/go-chi/chi/v5 v5.0.7
+	github.com/oklog/ulid/v2 v2.1.0
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.7.1
 	golang.org/x/crypto v0.0.0-20220722155217-630584e8d5aa
