@@ -1,3 +1,5 @@
+// Package restdb turns any SQL database into a RESTful API.
+// Currently supports MySQL, MariaDB, PostgreSQL, and SQLite.
 package restdb
 
 import (
