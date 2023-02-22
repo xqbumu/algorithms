@@ -1,0 +1,27 @@
+{
+  "web": {
+    "http_addr": "127.0.0.1:8080",
+    "cors": true
+  },
+  "databases": {
+    "db_demo": {
+      "type": "sqlite3",
+      "url": "./db_demo.sqlite3"
+    }
+  },
+  "scripts": {
+    "init": {
+      "database": "db_demo",
+      "path": "init_demo.sql",
+      "public_exec": true
+    }
+  },
+  "tables": {
+    "tbl_demo": {
+      "database": "db_demo",
+      "object": "tbl_demo",
+      "public_read": true,
+      "public_write": true
+    }
+  }
+}
