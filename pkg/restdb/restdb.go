@@ -1,4 +1,4 @@
-package main
+package restdb
 
 import (
 	"encoding/json"
@@ -12,7 +12,22 @@ import (
 
 var format = "json"
 
-func defaultHandler(w http.ResponseWriter, r *http.Request) {
+type App struct {
+	Web       *Web                 `json:"web"`
+	Databases map[string]*Database `json:"databases"`
+	Scripts   map[string]*Script   `json:"scripts"`
+	Tables    map[string]*Table    `json:"tables"`
+	Tokens    map[string]*[]Access `json:"tokens"`
+	Opt       map[string]any       `json:"opt"`
+}
+
+func NewApp(confBytes []byte) (*App, error) {
+	var app *App
+	err := json.Unmarshal(confBytes, &app)
+	return app, err
+}
+
+func (app App) Handler(w http.ResponseWriter, r *http.Request) {
 	if app.Web.Cors {
 		w.Header().Set("Access-Control-Allow-Origin", r.Header.Get("Origin"))
 		w.Header().Set("Access-Control-Allow-Credentials", "true")
@@ -40,7 +55,7 @@ func defaultHandler(w http.ResponseWriter, r *http.Request) {
 
 	methodUpper := strings.ToUpper(r.Method)
 
-	authorized, err := authorize(methodUpper, authHeader, databaseId, objectId)
+	authorized, err := app.authorize(methodUpper, authHeader, databaseId, objectId)
 	if !authorized {
 		fmt.Fprintf(w, `{"error":"%v"}`, err.Error())
 		return
@@ -123,7 +138,7 @@ func defaultHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func authorize(methodUpper string, authHeader string, databaseId string, object string) (bool, error) {
+func (app App) authorize(methodUpper string, authHeader string, databaseId string, object string) (bool, error) {
 	// if object is not found, return false
 	// if object is found, check if it is public
 	// if object is not public, return true regardless of token

@@ -1,25 +1,9 @@
-package main
+package restdb
 
 import (
 	"database/sql"
-	"encoding/json"
 	"fmt"
 )
-
-type App struct {
-	Web       *Web                 `json:"web"`
-	Databases map[string]*Database `json:"databases"`
-	Scripts   map[string]*Script   `json:"scripts"`
-	Tables    map[string]*Table    `json:"tables"`
-	Tokens    map[string]*[]Access `json:"tokens"`
-	Opt       map[string]any       `json:"opt"`
-}
-
-func NewApp(confBytes []byte) (*App, error) {
-	var app *App
-	err := json.Unmarshal(confBytes, &app)
-	return app, err
-}
 
 type Web struct {
 	HttpAddr  string `json:"http_addr"`

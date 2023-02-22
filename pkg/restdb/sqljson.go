@@ -1,4 +1,4 @@
-package main
+package restdb
 
 import (
 	"database/sql"

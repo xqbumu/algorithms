@@ -1,6 +1,7 @@
 package main
 
 import (
+	"algorithms/pkg/restdb"
 	"flag"
 	"fmt"
 	"log"
@@ -17,7 +18,7 @@ func init() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 }
 
-var app *App
+var app *restdb.App
 
 func main() {
 
@@ -28,12 +29,12 @@ func main() {
 		log.Fatal(err)
 	}
 
-	app, err = NewApp(confBytes)
+	app, err = restdb.NewApp(confBytes)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	http.HandleFunc("/", defaultHandler)
+	http.HandleFunc("/", app.Handler)
 
 	if app.Web.HttpAddr != "" {
 		srv := &http.Server{
@@ -59,5 +60,5 @@ func main() {
 		}()
 	}
 
-	Hook(nil)
+	restdb.Hook(nil)
 }
