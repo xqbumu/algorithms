@@ -5,7 +5,7 @@
   },
   "databases": {
     "db_demo": {
-      "type": "sqlite3",
+      "type": "sqlite",
       "url": "./db_demo.sqlite3"
     }
   },
@@ -13,7 +13,7 @@
     "init": {
       "database": "db_demo",
       "path": "init_demo.sql",
-      "public_exec": true
+      "public": true
     }
   },
   "tables": {
