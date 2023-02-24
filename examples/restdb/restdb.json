@@ -19,7 +19,7 @@
   "tables": {
     "tbl_demo": {
       "database": "db_demo",
-      "object": "tbl_demo",
+      "name": "tbl_demo",
       "public_read": true,
       "public_write": true
     }
