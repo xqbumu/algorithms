@@ -10,6 +10,8 @@ import (
 	"net/url"
 	"os"
 	"strings"
+
+	"golang.org/x/exp/slices"
 )
 
 var format = "json"
@@ -38,13 +40,18 @@ func (app App) Handler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if r.Method == "OPTIONS" {
-		w.Header().Set("Allow", "GET,POST,PATCH,DELETE,OPTIONS")
+		w.Header().Set("Allow", "GET,POST,PUT,PATCH,DELETE,OPTIONS")
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 
-	urlParts := strings.Split(r.URL.Path[1:], "/")
+	urlPath := r.URL.Path
+	urlPrefix := FromPrefix(r.Context())
+	if len(urlPrefix) > 0 {
+		urlPath = urlPath[len(urlPrefix):]
+	}
+	urlParts := strings.Split(strings.TrimPrefix(urlPath, "/"), "/")
 	databaseId := urlParts[0]
 	database := app.Databases[databaseId]
 	if database == nil {
@@ -76,27 +83,32 @@ func (app App) Handler(w http.ResponseWriter, r *http.Request) {
 
 	var result any
 
-	if methodUpper == "EXEC" {
+	if methodUpper == "EXEC" || methodUpper == http.MethodPatch {
 		script := app.Scripts[objectId]
 		if script == nil {
 			fmt.Fprintf(w, `{"error":"script %v not found"}`, objectId)
 			return
 		}
-		if len(script.Statements) == 0 {
-			script.Text = strings.TrimSpace(script.Text)
-			script.Path = strings.TrimSpace(script.Path)
-			if script.Text == "" && script.Path == "" {
+		script.SQL = strings.TrimSpace(script.SQL)
+		script.Path = strings.TrimSpace(script.Path)
+
+		if os.Getenv("env") == "dev" {
+			script.built = false
+		}
+
+		if !script.built {
+			if script.SQL == "" && script.Path == "" {
 				fmt.Fprintf(w, `{"error":"script %v is empty"}`, objectId)
 				return
 			}
 
-			if script.Text == "" {
+			if script.Path != "" {
 				f, err := os.ReadFile(script.Path)
 				if err != nil {
 					fmt.Fprintf(w, `{"error":"%v"}`, err.Error())
 					return
 				}
-				script.Text = string(f)
+				script.SQL = string(f)
 			}
 
 			err = BuildStatements(script, database.IsPg())
@@ -123,7 +135,12 @@ func (app App) Handler(w http.ResponseWriter, r *http.Request) {
 		if len(urlParts) > 2 {
 			dataId = urlParts[2]
 		}
-		result, err = runTable(methodUpper, database, objectId, dataId, params)
+		table := app.Tables[objectId]
+		if table == nil {
+			fmt.Fprintf(w, `{"error":"table %v not found"}`, objectId)
+			return
+		}
+		result, err = runTable(methodUpper, database, table, dataId, params)
 		if err != nil {
 			result = map[string]any{
 				"error": err.Error(),
@@ -140,28 +157,28 @@ func (app App) Handler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (app App) authorize(methodUpper string, authHeader string, databaseId string, object string) (bool, error) {
+func (app App) authorize(methodUpper string, authHeader string, databaseId string, objectId string) (bool, error) {
 	// if object is not found, return false
 	// if object is found, check if it is public
 	// if object is not public, return true regardless of token
 	// if database is not specified in object, the object is shared across all databases
-	if methodUpper == "EXEC" {
-		script := app.Scripts[object]
+	if methodUpper == "EXEC" || methodUpper == http.MethodPatch {
+		script := app.Scripts[objectId]
 		if script == nil || (script.Database != "" && script.Database != databaseId) {
-			return false, fmt.Errorf("script %v not found", object)
+			return false, fmt.Errorf("script %v not found", objectId)
 		}
-		if script.PublicExec {
+		if script.Public {
 			return true, nil
 		}
 	} else {
-		table := app.Tables[object]
+		table := app.Tables[objectId]
 		if table == nil || (table.Database != "" && table.Database != databaseId) {
-			return false, fmt.Errorf("table %v not found", object)
+			return false, fmt.Errorf("table %v not found", objectId)
 		}
-		if table.PublicRead && methodUpper == "GET" {
+		if table.PublicRead && methodUpper == http.MethodGet {
 			return true, nil
 		}
-		if table.PublicWrite && (methodUpper == "POST" || methodUpper == "PATCH" || methodUpper == "DELETE") {
+		if table.PublicWrite && (methodUpper == http.MethodPost || methodUpper == http.MethodPut || methodUpper == http.MethodDelete) {
 			return true, nil
 		}
 	}
@@ -170,14 +187,14 @@ func (app App) authorize(methodUpper string, authHeader string, databaseId strin
 	// if token doesn't have any access, return false
 	accesses := app.Tokens[authHeader]
 	if accesses == nil || len(*accesses) == 0 {
-		return false, fmt.Errorf("access token not found")
+		return false, fmt.Errorf("access denied")
 	}
 
 	// when token has access, check if any access is allowed for database and object
 	for _, access := range *accesses {
-		if access.Database == databaseId && access.Object == object {
+		if access.Database == databaseId && slices.Contains(access.Objects, objectId) {
 			switch methodUpper {
-			case "EXEC":
+			case "EXEC", http.MethodPatch:
 				if access.Exec {
 					return true, nil
 				}
@@ -185,22 +202,22 @@ func (app App) authorize(methodUpper string, authHeader string, databaseId strin
 				if access.Read {
 					return true, nil
 				}
-			case http.MethodPost, http.MethodPatch, http.MethodDelete:
+			case http.MethodPost, http.MethodPut, http.MethodDelete:
 				if access.Write {
 					return true, nil
 				}
 			}
 		}
 	}
-	return false, fmt.Errorf("access token not allowed for database %v and object %v", databaseId, object)
+	return false, fmt.Errorf("access token not allowed for database %v and object %v", databaseId, objectId)
 }
 
-func runTable(method string, database *Database, table string, dataId any, params map[string]any) (any, error) {
+func runTable(method string, database *Database, table *Table, dataId any, params map[string]any) (any, error) {
 	db, err := database.Open()
 	if err != nil {
 		return nil, err
 	}
-	sqlSafe(&table)
+	sqlSafe(&table.Name)
 	switch method {
 	case http.MethodGet:
 		if dataId == "" {
@@ -208,9 +225,9 @@ func runTable(method string, database *Database, table string, dataId any, param
 			if err != nil {
 				return nil, err
 			}
-			return QueryToMap(db, Lower, fmt.Sprintf(`SELECT * FROM %v WHERE TRUE %v`, table, where), values...)
+			return QueryToMap(db, Lower, fmt.Sprintf(`SELECT * FROM %v WHERE TRUE %v`, table.Name, where), values...)
 		} else {
-			r, err := QueryToMap(db, Lower, fmt.Sprintf(`SELECT * FROM %v WHERE id=%v`, table, database.GetPlaceHolder(0)), dataId)
+			r, err := QueryToMap(db, Lower, fmt.Sprintf(`SELECT * FROM %v WHERE id=%v`, table.Name, database.GetPlaceHolder(0)), dataId)
 			if err != nil {
 				return nil, err
 			}
@@ -226,15 +243,15 @@ func runTable(method string, database *Database, table string, dataId any, param
 		if err != nil {
 			return nil, err
 		}
-		return Exec(db, fmt.Sprintf(`INSERT INTO %v (%v) VALUES (%v)`, table, keys, qms), values...)
-	case http.MethodPatch:
+		return Exec(db, fmt.Sprintf(`INSERT INTO %v (%v) VALUES (%v)`, table.Name, keys, qms), values...)
+	case http.MethodPut:
 		set, values, err := mapForSqlUpdate(params, database.IsPg())
 		if err != nil {
 			return nil, err
 		}
-		return Exec(db, fmt.Sprintf(`UPDATE %v SET %v WHERE ID=%v`, table, set, database.GetPlaceHolder(len(params))), append(values, dataId)...)
+		return Exec(db, fmt.Sprintf(`UPDATE %v SET %v WHERE ID=%v`, table.Name, set, database.GetPlaceHolder(len(params))), append(values, dataId)...)
 	case http.MethodDelete:
-		return Exec(db, fmt.Sprintf(`DELETE FROM %v WHERE ID=%v`, table, database.GetPlaceHolder(0)), dataId)
+		return Exec(db, fmt.Sprintf(`DELETE FROM %v WHERE ID=%v`, table.Name, database.GetPlaceHolder(0)), dataId)
 	}
 	return nil, fmt.Errorf("Method %v not supported.", method)
 }
@@ -245,7 +262,6 @@ func runExec(database *Database, script *Script, params map[string]any) (any, er
 		return nil, err
 	}
 	exportedResults := map[string]any{}
-	var result any
 
 	tx, err := db.Begin()
 	if err != nil {
@@ -253,17 +269,17 @@ func runExec(database *Database, script *Script, params map[string]any) (any, er
 	}
 
 	for _, statement := range script.Statements {
-		if len(statement.Text) == 0 {
+		if len(statement.SQL) == 0 {
 			continue
 		}
-		SqlNormalize(&statement.Text)
 
 		// double underscore
 		scriptParams := ExtractScriptParamsFromMap(params)
 		for k, v := range scriptParams {
-			statement.Text = strings.ReplaceAll(statement.Text, k, v.(string))
+			statement.SQL = strings.ReplaceAll(statement.SQL, k, v.(string))
 		}
 
+		var result any
 		sqlParams := []any{}
 		for _, param := range statement.Params {
 			if val, ok := params[param]; ok {
@@ -276,7 +292,7 @@ func runExec(database *Database, script *Script, params map[string]any) (any, er
 
 		if statement.Query {
 			if format == "array" {
-				header, data, err := QueryToArray(tx, Lower, statement.Text, sqlParams...)
+				header, data, err := QueryToArray(tx, Lower, statement.SQL, sqlParams...)
 				if err != nil {
 					tx.Rollback()
 					return nil, err
@@ -288,7 +304,7 @@ func runExec(database *Database, script *Script, params map[string]any) (any, er
 					}
 				}
 			} else {
-				result, err = QueryToMap(tx, Lower, statement.Text, sqlParams...)
+				result, err = QueryToMap(tx, Lower, statement.SQL, sqlParams...)
 				if err != nil {
 					tx.Rollback()
 					return nil, err
@@ -298,7 +314,7 @@ func runExec(database *Database, script *Script, params map[string]any) (any, er
 				}
 			}
 		} else {
-			result, err = Exec(tx, statement.Text, sqlParams...)
+			result, err = Exec(tx, statement.SQL, sqlParams...)
 			if err != nil {
 				tx.Rollback()
 				return nil, err
@@ -311,5 +327,11 @@ func runExec(database *Database, script *Script, params map[string]any) (any, er
 	}
 
 	tx.Commit()
+	if len(exportedResults) == 0 {
+		return nil, nil
+	}
+	if len(exportedResults) == 1 && exportedResults["0"] != nil {
+		return exportedResults["0"], nil
+	}
 	return exportedResults, nil
 }

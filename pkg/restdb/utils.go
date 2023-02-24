@@ -151,7 +151,7 @@ func mapForSqlWhere(m map[string]any, pgx bool) (where string, values []any, err
 }
 
 func BuildStatements(script *Script, pgx bool) error {
-	statements, err := SplitArgs(script.Text, ";", true)
+	statements, err := SplitArgs(script.SQL, ";", true)
 	if err != nil {
 		return err
 	}
@@ -169,7 +169,7 @@ func BuildStatements(script *Script, pgx bool) error {
 		statement := &Statement{
 			Index:  index,
 			Label:  label,
-			Text:   statementSQL,
+			SQL:    statementSQL,
 			Params: params,
 			Script: script,
 			Query:  IsQuery(statementSQL),

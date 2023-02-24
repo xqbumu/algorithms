@@ -41,17 +41,17 @@ func (db *Database) IsPg() bool {
 }
 
 type Access struct {
-	Database string `json:"database"`
-	Object   string `json:"object"`
-	Read     bool   `json:"read"`
-	Write    bool   `json:"write"`
-	Exec     bool   `json:"exec"`
+	Database string   `json:"database"`
+	Objects  []string `json:"objects"`
+	Read     bool     `json:"read"`
+	Write    bool     `json:"write"`
+	Exec     bool     `json:"exec"`
 }
 
 type Statement struct {
 	Index  int
 	Label  string
-	Text   string
+	SQL    string
 	Params []string
 	Query  bool
 	Export bool
@@ -60,10 +60,11 @@ type Statement struct {
 
 type Script struct {
 	Database   string `json:"database"`
-	Text       string `json:"text"`
+	SQL        string `json:"sql"`
 	Path       string `json:"path"`
-	PublicExec bool   `json:"public_exec"`
+	Public     bool   `json:"public"`
 	Statements []*Statement
+	built      bool
 }
 
 type Table struct {
