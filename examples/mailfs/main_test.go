@@ -1,14 +1,21 @@
 package main
 
 import (
+	"bytes"
+	"fmt"
+	"io"
 	"log"
+	"math/rand"
+	"os"
 	"testing"
+	"time"
 
 	"github.com/emersion/go-imap"
+	"github.com/emersion/go-message/mail"
 )
 
 // Select INBOX 已发送 草稿箱 MailDisk
-const boxName = "Drafts"
+const boxName = "MailDisk"
 
 func TestClient(t *testing.T) {
 	c := login()
@@ -82,47 +89,92 @@ func TestSTMP(t *testing.T) {
 	// Don't forget to logout
 	defer c.Logout()
 
-	// // Write the message to a buffer
-	// var b bytes.Buffer
-	// // b.WriteString("From: <...@gmail.com>\r\n")
-	// // b.WriteString("To: <...@gmail.com>\r\n")
-	// fmt.Fprintf(&b, "Subject: No.%d\r\n", rand.Int())
-	// b.WriteString("\r\n")
-	// // Message body
-	// b.WriteString("Append test using IMAP and Draft folder")
+	b := generateMail()
 
-	// // Append it to Drafts
-	// if err := c.Append(boxName, nil, time.Now(), &b); err != nil {
-	// 	log.Fatal(err)
-	// }
+	// Append it to Drafts
+	if err := c.Append(boxName, nil, time.Now(), &b); err != nil {
+		log.Fatal(err)
+	}
+}
 
-	// // Store it to Drafts
-	// header := mail.AttachmentHeader{
-	// 	Header: message.Header{},
-	// }
-	// header.SetFilename("README.md")
-	// attachment, err := message.New(header.Header, strings.NewReader("Hello Go"))
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
+func generateMail() bytes.Buffer {
+	// Write the message to a buffer
+	var b bytes.Buffer
 
-	updates := make(chan *imap.Message, 1)
-	// if msg, err := message.NewMultipart(message.Header{}, []*message.Entity{attachment}); err != nil {
-	// 	imap.NewMessage(999, []imap.FetchItem{})
-	// 	updates <- msg
-	// }
+	from := []*mail.Address{{Name: "Dev", Address: "dev@example.org"}}
+	to := []*mail.Address{{Name: "Customer", Address: "customer@example.org"}}
 
-	seqSet := new(imap.SeqSet)
-	seqSet.AddRange(1, 1)
-	_, err := c.Select(boxName, false)
+	// Create our mail header
+	var h mail.Header
+	h.SetDate(time.Now())
+	h.SetAddressList("From", from)
+	h.SetAddressList("To", to)
+	// Set Subject
+	h.SetSubject(fmt.Sprintf("No.%d\r\n", rand.Int()))
+	h.Add("X-Mailfs-Enbale", "true")
+	h.Add("X-Mailfs-Type", "file")
+
+	// Create a new mail writer
+	mw, err := mail.CreateWriter(&b, h)
 	if err != nil {
 		log.Fatal(err)
 	}
-	if err := c.Store(seqSet, imap.DraftFlag, []any{"body", "foobar"}, updates); err != nil {
+
+	// Create a text part
+	tw, err := mw.CreateInline()
+	if err != nil {
 		log.Fatal(err)
 	}
-
-	for m := range updates {
-		log.Println(m)
+	var th mail.InlineHeader
+	th.Set("Content-Type", "text/plain")
+	w, err := tw.CreatePart(th)
+	if err != nil {
+		log.Fatal(err)
 	}
+	io.WriteString(w, "Who are you?")
+	w.Close()
+	tw.Close()
+
+	// Create first attachment
+	var ah mail.AttachmentHeader
+	ah.Set("Content-Type", "test/plain")
+	ah.SetFilename("main.go")
+	w, err = mw.CreateAttachment(ah)
+	if err != nil {
+		log.Fatal(err)
+	}
+	// TODO: write a Go file to w
+	fp, err := os.Open("main.go")
+	if err != nil {
+		log.Fatal(err)
+	}
+	written, err := io.Copy(w, fp)
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Printf("written %d", written)
+	w.Close()
+
+	// Create second attachment
+	ah.Set("Content-Type", "test/plain")
+	ah.SetFilename("utils.go")
+	w, err = mw.CreateAttachment(ah)
+	if err != nil {
+		log.Fatal(err)
+	}
+	// TODO: write a Go file to w
+	fp, err = os.Open("utils.go")
+	if err != nil {
+		log.Fatal(err)
+	}
+	written, err = io.Copy(w, fp)
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Printf("written %d", written)
+	w.Close()
+
+	mw.Close()
+
+	return b
 }
