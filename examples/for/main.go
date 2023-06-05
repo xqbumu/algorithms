@@ -30,6 +30,8 @@ func main() {
 			[]string{"code", "method"},
 		)
 	)
+
+	log.Println(randomNumbers != nil && requestCount != nil)
 }
 
 func genStr(i int) string {
