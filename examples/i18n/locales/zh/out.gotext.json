@@ -1,0 +1,20 @@
+{
+    "language": "zh",
+    "messages": [
+        {
+            "id": "Welcome {Host}!",
+            "message": "Welcome {Host}!",
+            "translation": "",
+            "placeholders": [
+                {
+                    "id": "Host",
+                    "string": "%[1]s",
+                    "type": "string",
+                    "underlyingType": "string",
+                    "argNum": 1,
+                    "expr": "r.Host"
+                }
+            ]
+        }
+    ]
+}

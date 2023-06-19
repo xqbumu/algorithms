@@ -1,0 +1,22 @@
+{
+    "language": "en-US",
+    "messages": [
+        {
+            "id": "Welcome {Host}!",
+            "message": "Welcome {Host}!",
+            "translation": "Welcome {Host}!",
+            "translatorComment": "Copied from source.",
+            "placeholders": [
+                {
+                    "id": "Host",
+                    "string": "%[1]s",
+                    "type": "string",
+                    "underlyingType": "string",
+                    "argNum": 1,
+                    "expr": "r.Host"
+                }
+            ],
+            "fuzzy": true
+        }
+    ]
+}

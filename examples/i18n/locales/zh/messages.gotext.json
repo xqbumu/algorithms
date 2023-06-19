@@ -1,0 +1,10 @@
+{
+    "language": "zh",
+    "messages": [
+        {
+            "id": "Welcome!",
+            "message": "Welcome!",
+            "translation": "欢迎！"
+        }
+    ]
+}

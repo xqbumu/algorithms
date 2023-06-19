@@ -1,0 +1,12 @@
+{
+    "language": "en-US",
+    "messages": [
+        {
+            "id": "Welcome!",
+            "message": "Welcome!",
+            "translation": "Welcome!",
+            "translatorComment": "Copied from source.",
+            "fuzzy": true
+        }
+    ]
+}
