@@ -1,0 +1,13 @@
+*
+!.gitignore
+!schema/
+!entc.go
+!generate.go
+!gqlgen.yml
+!*.resolvers.go
+!resolver.go
+
+!*.graphql
+ent.graphql
+
+!/proto/entpb/ext.go
