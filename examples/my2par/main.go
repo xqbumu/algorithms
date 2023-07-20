@@ -27,7 +27,7 @@ func main() {
 	flag.StringVar(&table, "table", "", "")
 	flag.StringVar(&pk, "pk", "", "")
 	flag.IntVar(&limit, "limit", -1, "")
-	flag.IntVar(&paegSize, "page-szie", 100000, "")
+	flag.IntVar(&paegSize, "page-size", 100000, "")
 	flag.Parse()
 
 	dsn = fmt.Sprintf("%s?charset=utf8mb4&parseTime=True&loc=Local", dsn)
@@ -49,10 +49,11 @@ func main() {
 		panic(err)
 	}
 
+	schema := parquet.SchemaOf(rv.Interface())
 	dest := parquet.NewWriter(
 		w,
 		parquet.Compression(&zstd.Codec{}),
-		parquet.SchemaOf(rv.Interface()),
+		schema,
 	)
 	defer dest.Close()
 
@@ -71,6 +72,9 @@ func main() {
 		}
 		if err := dest.Flush(); err != nil {
 			panic(err)
+		}
+		if limit > 0 && page.Size*page.Page > limit {
+			break
 		}
 		page.Page += 1
 		log.Printf("round: %d", round)
@@ -147,8 +151,14 @@ func getTableSchema(db *gorm.DB, table string) (reflect.Value, []interface{}, er
 			var t *time.Time
 			f.Type = reflect.TypeOf(t)
 		case *sql.RawBytes:
-			var t *string
-			f.Type = reflect.TypeOf(t)
+			switch c.DatabaseTypeName() {
+			case "DECIMAL":
+				var t *float64
+				f.Type = reflect.TypeOf(t)
+			default:
+				var t *string
+				f.Type = reflect.TypeOf(t)
+			}
 		case **interface{}:
 			var t *string
 			f.Type = reflect.TypeOf(t)
