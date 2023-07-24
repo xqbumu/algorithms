@@ -4,18 +4,21 @@ import (
 	"database/sql"
 	"fmt"
 	"reflect"
+	"time"
 
 	"github.com/jimsmart/schema"
-	"github.com/segmentio/parquet-go"
+	"gorm.io/gorm"
 )
 
-func Generate(db *sql.DB, table string) (*parquet.Schema, []interface{}, error) {
-	ct, err := schema.ColumnTypes(db, "", table)
+func TableSchema(db *gorm.DB, table string) (reflect.Value, []interface{}, error) {
+	conn, err := db.DB()
 	if err != nil {
-		return nil, nil, err
+		return reflect.Value{}, nil, err
 	}
-
-	ptrValues := make([]interface{}, len(ct))
+	ct, err := schema.ColumnTypes(conn, "", table)
+	if err != nil {
+		return reflect.Value{}, nil, err
+	}
 
 	var fields []reflect.StructField
 
@@ -26,6 +29,12 @@ func Generate(db *sql.DB, table string) (*parquet.Schema, []interface{}, error) 
 		}
 		tt := reflect.New(c.ScanType()).Interface()
 		switch tt.(type) {
+		case *int8, *int32, *uint32:
+			var t *int32
+			f.Type = reflect.TypeOf(t)
+		case *int64:
+			var t *int64
+			f.Type = reflect.TypeOf(t)
 		case *sql.NullBool:
 			var t *bool
 			f.Type = reflect.TypeOf(t)
@@ -38,9 +47,18 @@ func Generate(db *sql.DB, table string) (*parquet.Schema, []interface{}, error) 
 		case *sql.NullString:
 			var t *string
 			f.Type = reflect.TypeOf(t)
-		case *sql.RawBytes:
-			var t []byte
+		case *sql.NullTime:
+			var t *time.Time
 			f.Type = reflect.TypeOf(t)
+		case *sql.RawBytes:
+			switch c.DatabaseTypeName() {
+			case "DECIMAL":
+				var t *float64
+				f.Type = reflect.TypeOf(t)
+			default:
+				var t *string
+				f.Type = reflect.TypeOf(t)
+			}
 		case **interface{}:
 			var t *string
 			f.Type = reflect.TypeOf(t)
@@ -53,14 +71,16 @@ func Generate(db *sql.DB, table string) (*parquet.Schema, []interface{}, error) 
 
 	typ := reflect.StructOf(fields)
 
-	v := reflect.New(typ).Elem()
-	for i := 0; i < v.NumField(); i++ {
-		ptrValues[i] = v.Field(i).Addr().Interface()
+	pVals := make([]interface{}, len(ct))
+
+	rv := reflect.New(typ).Elem()
+	for i := 0; i < rv.NumField(); i++ {
+		pVals[i] = rv.Field(i).Addr().Interface()
 	}
 
-	for i := 0; i < v.NumField(); i++ {
-		ptrValues[i] = v.Field(i).Addr().Interface()
+	for i := 0; i < rv.NumField(); i++ {
+		pVals[i] = rv.Field(i).Addr().Interface()
 	}
 
-	return parquet.SchemaOf(v.Interface()), ptrValues, nil
+	return rv, pVals, nil
 }
