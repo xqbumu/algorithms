@@ -25,7 +25,12 @@ func index() fir.RouteOptions {
 }
 
 func main() {
-	controller := fir.NewController("counter_app", fir.DevelopmentMode(true), fir.WithDisableWebsocket())
+	controller := fir.NewController(
+		"counter_app",
+		fir.DevelopmentMode(true),
+		// fir.WithWebsocketUpgrader(websocket.Upgrader{}),
+		// fir.WithDisableWebsocket(),
+	)
 	http.Handle("/", controller.RouteFunc(index))
 	http.ListenAndServe(":9867", nil)
 }

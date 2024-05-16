@@ -1,0 +1,16 @@
+{
+  "name": "golte",
+  "version": "1.0.0",
+  "description": "",
+  "type": "module",
+  "scripts": {
+    "routers": "golte && go run ./routers"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "golte": "^0.0.3",
+    "svelte": "^4.2.9"
+  }
+}

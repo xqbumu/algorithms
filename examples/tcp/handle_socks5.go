@@ -7,9 +7,8 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"log/slog"
 	"net"
-
-	"golang.org/x/exp/slog"
 )
 
 const (

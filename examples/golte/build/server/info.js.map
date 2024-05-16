@@ -1,0 +1,1 @@
+{"version":3,"file":"info.js","sources":["node_modules/.pnpm/golte@0.0.3_svelte@4.2.9/node_modules/golte/js/server/info.js"],"sourcesContent":["// @ts-ignore\nexport let Assets = golteAssets;\n//# sourceMappingURL=info.js.map"],"names":[],"mappings":";;AACU,IAAC,SAAS;;","x_google_ignoreList":[0]}

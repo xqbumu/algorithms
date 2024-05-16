@@ -1,0 +1,17 @@
+cert:
+  name: "Ark, Inc"
+peers:
+  - name: mbam2
+    ip: "172.16.100.1/16"
+    groups: [personal, work]
+  - name: pi3
+    ip: "172.16.101.1/16"
+    groups: [personal, work, ssh]
+  - name: azure-ark
+    ip: "172.16.102.1/16"
+    groups: [servers]
+    lighthouse: true
+    addr: "20.24.65.170"
+  - name: sg-minipc
+    ip: "172.16.103.1/16"
+    groups: [servers]

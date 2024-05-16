@@ -1,0 +1,12 @@
+languages:
+  - tag: en
+    name: english
+  - tag: nl
+    name: dutch
+  - tag: no
+    name: norwegian
+
+name: norwegian
+
+model:
+  ident: pages

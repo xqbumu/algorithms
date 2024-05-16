@@ -1,9 +1,9 @@
 package main
 
 import (
-	"algorithms/assets"
-	"algorithms/pkg/httpfake"
-	"algorithms/pkg/netfake"
+	"algorithms/examples/h2fp/assets"
+	"algorithms/examples/h2fp/pkg/httpfake"
+	"algorithms/examples/h2fp/pkg/netfake"
 	"crypto/tls"
 	"html/template"
 	"io"
