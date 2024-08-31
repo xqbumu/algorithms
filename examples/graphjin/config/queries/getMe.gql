@@ -1,0 +1,5 @@
+query getMe {
+  users(id: 1) {
+    full_name
+  }
+}

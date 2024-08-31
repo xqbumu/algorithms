@@ -1,0 +1,11 @@
+query getProducts {
+  products {
+    id
+    name
+    description
+    customers {
+      id
+      email
+    }
+  }
+}

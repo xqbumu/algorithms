@@ -200,8 +200,7 @@ func (r *FcgiRequest) writeBeginRequest(conn io.Writer) error {
 	if r.keepAlive {
 		flags = FCGI_KEEP_CONN
 	}
-	role := FCGI_RESPONDER
-	data := [8]byte{byte(role >> 8), byte(role), flags}
+	data := [8]byte{byte(0), FCGI_RESPONDER, flags}
 	return r.writeRecord(conn, FCGI_BEGIN_REQUEST, data[:])
 }
 

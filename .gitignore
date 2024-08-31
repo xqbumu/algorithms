@@ -21,3 +21,4 @@ output/
 
 examples/sshkit/sshkit
 __debug_bin*
+.env
