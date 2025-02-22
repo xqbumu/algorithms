@@ -10,7 +10,6 @@ import (
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/input"
 	"github.com/go-rod/rod/lib/launcher"
-	"github.com/go-rod/rod/lib/launcher/flags"
 	"github.com/go-rod/rod/lib/proto"
 	"github.com/go-rod/rod/lib/utils"
 )
@@ -19,7 +18,66 @@ func main() {
 	browser, clean := newBrowser()
 	defer clean()
 
-	RunGoogle(browser)
+	RunSgpbusiness(browser)
+}
+
+func RunSgpbusiness(browser *rod.Browser) {
+	for _, page := range browser.MustPages() {
+		page.MustClose()
+	}
+
+	// page := stealth.MustPage(browser)
+
+	// // new page clear cookie，inject stealth.JS
+	// go browser.EachEvent(func(e *proto.TargetTargetCreated) {
+	// 	if e.TargetInfo.Type != proto.TargetTargetInfoTypePage {
+	// 		return
+	// 	}
+	// 	browser.MustPageFromTargetID(e.TargetInfo.TargetID).MustEvalOnNewDocument(stealth.JS)
+	// })()
+
+	// Create a new page
+	// page := browser.MustPage("https://www.sgpbusiness.com/").MustWaitLoad()
+	page := browser.MustPage("https://www.baidu.com/").MustWaitLoad()
+	page.WaitStable(time.Millisecond * 800)
+
+	search := page.MustElement("input[type=checkbox]")
+	pt, err := search.WaitInteractable()
+	if err != nil {
+		panic(err)
+	}
+	page.Mouse.MoveTo(*pt)
+
+	search.MustParent().Click(proto.InputMouseButtonLeft, 1)
+	page.WaitStable(time.Millisecond * 800)
+
+	search.MustInput("golang").MustType(input.Enter)
+	page.WaitStable(time.Millisecond * 1200)
+
+	slog.Info("Pause")
+	utils.Pause()
+}
+
+func RunBaidu(browser *rod.Browser) {
+	// Create a new page
+	page := browser.MustPage("https://baidu.com").MustWaitLoad()
+	page.WaitStable(time.Millisecond * 800)
+
+	search := page.MustElement("#kw")
+	pt, err := search.WaitInteractable()
+	if err != nil {
+		panic(err)
+	}
+	page.Mouse.MoveTo(*pt)
+
+	search.MustParent().Click(proto.InputMouseButtonLeft, 1)
+	page.WaitStable(time.Millisecond * 800)
+
+	search.MustInput("golang").MustType(input.Enter)
+	page.WaitStable(time.Millisecond * 1200)
+
+	slog.Info("Pause")
+	utils.Pause()
 }
 
 func RunGoogle(browser *rod.Browser) {
@@ -99,11 +157,15 @@ func RunDiscuz(browser *rod.Browser) {
 }
 
 func newBrowser() (*rod.Browser, func()) {
-	l := launcher.New().Set(flags.Headless, "new")
+	l := launcher.New().
+		Bin("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome").
+		UserDataDir("tmp/user").
+		Set("disable-default-apps").
+		Set("no-first-run")
 	if path, exists := launcher.LookPath(); exists && false {
 		l = launcher.New().Bin(path)
 	}
-	l.Headless(true).Devtools(true)
+	l.Headless(false).Devtools(true)
 	// defer l.Cleanup() // remove launcher.FlagUserDataDir
 
 	// Launch a new browser with default options, and connect to it.
@@ -112,9 +174,10 @@ func newBrowser() (*rod.Browser, func()) {
 	// each action, making it easier to inspect what your code is doing.
 	browser := rod.New().
 		ControlURL(l.MustLaunch()).
-		// Trace(true).
+		Trace(false).
 		SlowMotion(2 * time.Second).
-		MustConnect()
+		MustConnect().
+		NoDefaultDevice()
 
 	// ServeMonitor plays screenshots of each tab. This feature is extremely
 	// useful when debugging with headless mode.
