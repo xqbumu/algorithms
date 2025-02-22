@@ -10,7 +10,6 @@ import (
 	"slices"
 
 	"github.com/go-ldap/ldap/v3"
-	"golang.org/x/text/encoding/unicode"
 )
 
 type LDAPClient struct {
@@ -159,11 +158,8 @@ func (lc *LDAPClient) ChnagePassword(username, oldPwd, newPwd string) error {
 	}()
 
 	// 修改密码
-	utf16 := unicode.UTF16(unicode.LittleEndian, unicode.IgnoreBOM)
-	// Remember to add double quotation marks to your password string !!!!!
-	pwdEncoded, _ := utf16.NewEncoder().String(fmt.Sprintf(`"%s"`, newPwd))
 	pwdModifyReq := ldap.NewModifyRequest(entry.DN, nil)
-	pwdModifyReq.Replace("unicodePwd", []string{pwdEncoded})
+	pwdModifyReq.Replace("unicodePwd", []string{encodePassword(newPwd)})
 	err = lc.Conn.Modify(pwdModifyReq)
 	return err
 }
@@ -212,4 +208,16 @@ func (lc *LDAPClient) findUser() (*ldap.Entry, error) {
 	}
 
 	return sr.Entries[0], nil
+}
+
+// AD 需要密码用 UTF-16LE 编码并 Base64 处理
+func encodePassword(password string) string {
+	quoted := fmt.Sprintf("\"%s\"", password) // AD 需要密码加上双引号
+	encoded := []byte(quoted)
+	utf16le := make([]byte, len(encoded)*2)
+	for i, b := range encoded {
+		utf16le[i*2] = b
+		utf16le[i*2+1] = 0
+	}
+	return string(utf16le)
 }
