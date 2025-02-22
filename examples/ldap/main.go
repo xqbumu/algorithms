@@ -5,22 +5,15 @@ import (
 	"log"
 )
 
-var base, bindDN, bindPassword, groupFilter, host, password, newPassword, serverName, userFilter, username string
-var port int
-var useSSL bool
-var skipTLS, skipTLSVerify bool
-
-type server struct{}
+var addr, base, bindDN, bindPassword, groupFilter, password, newPassword, serverName, userFilter, username string
+var skipTLSVerify bool
 
 func main() {
 	flag.Parse()
 
 	client := &LDAPClient{
+		Addr:               addr,
 		Base:               base,
-		Host:               host,
-		Port:               port,
-		UseSSL:             useSSL,
-		SkipTLS:            skipTLS,
 		BindDN:             bindDN,
 		BindPassword:       bindPassword,
 		UserFilter:         userFilter,
@@ -60,14 +53,11 @@ func init() {
 	flag.StringVar(&bindDN, "bind-dn", "uid=readonlysuer,ou=People,dc=demo,dc=dev", "Bind DN")
 	flag.StringVar(&bindPassword, "bind-pwd", "readonlypassword", "Bind password")
 	flag.StringVar(&groupFilter, "group-filter", "(memberUid=%s)", "Group filter")
-	flag.StringVar(&host, "host", "ldap.demo.dev", "LDAP host")
-	flag.StringVar(&password, "password", "", "Password")
-	flag.StringVar(&newPassword, "new-pwd", "", "Password")
-	flag.IntVar(&port, "port", 389, "LDAP port")
+	flag.StringVar(&addr, "addr", "ldap://demo.dev:389", "LDAP addr")
+	flag.StringVar(&serverName, "server-name", "", "Server name for SSL (if use-ssl is set)")
 	flag.StringVar(&userFilter, "user-filter", "(uid=%s)", "User filter")
 	flag.StringVar(&username, "username", "", "Username")
-	flag.StringVar(&serverName, "server-name", "", "Server name for SSL (if use-ssl is set)")
-	flag.BoolVar(&useSSL, "use-ssl", false, "Use SSL")
-	flag.BoolVar(&skipTLS, "skip-tls", false, "Skip TLS start")
+	flag.StringVar(&password, "password", "", "Password")
+	flag.StringVar(&newPassword, "new-pwd", "", "Password")
 	flag.BoolVar(&skipTLSVerify, "skip-tls-verify", false, "Skip TLS verify")
 }

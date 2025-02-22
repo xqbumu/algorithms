@@ -6,6 +6,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"log"
 	"slices"
 
 	"github.com/go-ldap/ldap/v3"
@@ -18,14 +19,11 @@ type LDAPClient struct {
 	BindDN             string
 	BindPassword       string
 	GroupFilter        string // e.g. "(memberUid=%s)"
-	Host               string
+	Addr               string
 	ServerName         string
 	UserFilter         string // e.g. "(uid=%s)"
 	Conn               *ldap.Conn
-	Port               int
 	InsecureSkipVerify bool
-	UseSSL             bool
-	SkipTLS            bool
 	ClientCertificates []tls.Certificate // Adding client certificates
 }
 
@@ -34,32 +32,18 @@ func (lc *LDAPClient) Connect() error {
 	if lc.Conn == nil {
 		var l *ldap.Conn
 		var err error
-		address := fmt.Sprintf("%s:%d", lc.Host, lc.Port)
-		if !lc.UseSSL {
-			l, err = ldap.Dial("tcp", address)
-			if err != nil {
-				return err
-			}
 
-			// Reconnect with TLS
-			if !lc.SkipTLS {
-				err = l.StartTLS(&tls.Config{InsecureSkipVerify: true})
-				if err != nil {
-					return err
-				}
-			}
-		} else {
-			config := &tls.Config{
-				InsecureSkipVerify: lc.InsecureSkipVerify,
-				ServerName:         lc.ServerName,
-			}
-			if len(lc.ClientCertificates) > 0 {
-				config.Certificates = lc.ClientCertificates
-			}
-			l, err = ldap.DialTLS("tcp", address, config)
-			if err != nil {
-				return err
-			}
+		config := &tls.Config{
+			InsecureSkipVerify: lc.InsecureSkipVerify,
+			ServerName:         lc.ServerName,
+		}
+		if len(lc.ClientCertificates) > 0 {
+			config.Certificates = lc.ClientCertificates
+		}
+
+		l, err = ldap.DialURL(lc.Addr, ldap.DialWithTLSConfig(config))
+		if err != nil {
+			return err
 		}
 
 		lc.Conn = l
@@ -194,6 +178,7 @@ func (lc *LDAPClient) findUser() (*ldap.Entry, error) {
 	if lc.BindDN != "" && lc.BindPassword != "" {
 		err := lc.Conn.Bind(lc.BindDN, lc.BindPassword)
 		if err != nil {
+			log.Printf("error binding as read only user: %+v", err)
 			return nil, err
 		}
 	}
@@ -214,6 +199,7 @@ func (lc *LDAPClient) findUser() (*ldap.Entry, error) {
 
 	sr, err := lc.Conn.Search(searchRequest)
 	if err != nil {
+		log.Printf("error searching for user %s: %+v", username, err)
 		return nil, err
 	}
 
