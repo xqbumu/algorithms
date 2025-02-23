@@ -7,7 +7,7 @@ import (
 	"os"
 )
 
-var addr, base, bindDN, bindPassword, groupFilter, password, newPassword, userFilter, username, certFile, clientCert string
+var addr, baseDN, bindDN, bindPassword, groupFilter, password, newPassword, userFilter, username, certFile, clientCert string
 var skipTLSVerify bool
 
 func main() {
@@ -30,7 +30,7 @@ func main() {
 
 	client := &LDAPClient{
 		Addr:               addr,
-		Base:               base,
+		BaseDN:             baseDN,
 		BindDN:             bindDN,
 		BindPassword:       bindPassword,
 		UserFilter:         userFilter,
@@ -66,7 +66,7 @@ func main() {
 }
 
 func init() {
-	flag.StringVar(&base, "base", "dc=demo,dc=dev", "Base LDAP")
+	flag.StringVar(&baseDN, "base-dn", "dc=demo,dc=dev", "BaseDN LDAP")
 	flag.StringVar(&bindDN, "bind-dn", "uid=readonlysuer,ou=People,dc=demo,dc=dev", "Bind DN")
 	flag.StringVar(&bindPassword, "bind-pwd", "readonlypassword", "Bind password")
 	flag.StringVar(&groupFilter, "group-filter", "(memberUid=%s)", "Group filter")
@@ -75,7 +75,7 @@ func init() {
 	flag.StringVar(&username, "username", "", "Username")
 	flag.StringVar(&password, "password", "", "Password")
 	flag.StringVar(&newPassword, "new-pwd", "", "New password")
-	flag.StringVar(&certFile, "cert-file", "", "")
-	flag.StringVar(&clientCert, "client-cert", "", "")
+	flag.StringVar(&certFile, "cert-file", "", "root cert file")
+	flag.StringVar(&clientCert, "client-cert", "", "client cert file")
 	flag.BoolVar(&skipTLSVerify, "skip-tls-verify", false, "Skip TLS verify")
 }

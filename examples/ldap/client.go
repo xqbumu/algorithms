@@ -16,7 +16,7 @@ import (
 
 type LDAPClient struct {
 	Addr               string
-	Base               string
+	BaseDN             string
 	BindDN             string
 	BindPassword       string
 	UserFilter         string // e.g. "(uid=%s)"
@@ -104,7 +104,7 @@ func (lc *LDAPClient) GetGroupsOfUser(username string) ([]string, error) {
 	defer l.Close()
 
 	searchRequest := ldap.NewSearchRequest(
-		lc.Base,
+		lc.BaseDN,
 		ldap.ScopeWholeSubtree, ldap.NeverDerefAliases, 0, 0, false,
 		fmt.Sprintf(lc.GroupFilter, username),
 		[]string{"cn"}, // can it be something else than "cn"?
@@ -159,7 +159,7 @@ func (lc *LDAPClient) findUser() (*ldap.Entry, error) {
 	}
 	// Search for the given username
 	searchRequest := ldap.NewSearchRequest(
-		lc.Base,
+		lc.BaseDN,
 		ldap.ScopeWholeSubtree, ldap.NeverDerefAliases, 0, 0, false,
 		fmt.Sprintf(lc.UserFilter, username),
 		attributes,
