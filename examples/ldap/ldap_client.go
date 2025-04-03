@@ -5,26 +5,26 @@ package main
 import (
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"log"
 	"slices"
 
 	"github.com/go-ldap/ldap/v3"
+	"golang.org/x/text/encoding/unicode"
 )
 
 type LDAPClient struct {
-	Addr               string
-	BaseDN             string
-	BindDN             string
-	BindPassword       string
-	UserFilter         string // e.g. "(uid=%s)"
-	GroupFilter        string // e.g. "(memberUid=%s)"
-	Attributes         []string
-	InsecureSkipVerify bool
-	CertPool           *x509.CertPool
-	ClientCertificates []tls.Certificate // Adding client certificates
+	Addr               string            `yaml:"addr" json:"addr,omitempty"`
+	BaseDN             string            `yaml:"baseDn" json:"base_dn,omitempty"`
+	BindDN             string            `yaml:"bindDn" json:"bind_dn,omitempty"`
+	BindPassword       string            `yaml:"bindPassword" json:"bind_password,omitempty"`
+	UserFilter         string            `yaml:"userFilter" json:"user_filter,omitempty"`   // e.g. "(uid=%s)"
+	GroupFilter        string            `yaml:"groupFilter" json:"group_filter,omitempty"` // e.g. "(memberUid=%s)"
+	Attributes         []string          `yaml:"attributes" json:"attributes,omitempty"`
+	InsecureSkipVerify bool              `yaml:"insecureSkipVerify" json:"insecure_skip_verify,omitempty"`
+	CertPool           *x509.CertPool    `yaml:"certPool" json:"cert_pool,omitempty"`
+	ClientCertificates []tls.Certificate `yaml:"clientCertificates" json:"client_certificates,omitempty"` // Adding client certificates
 }
 
 // Connect connects to the ldap backend.
@@ -56,6 +56,16 @@ func (lc *LDAPClient) Connect(bind bool) (*ldap.Conn, error) {
 				return nil, err
 			}
 		}
+		// check server type
+		searchRequest := ldap.NewSearchRequest(
+			lc.BindDN,
+			ldap.ScopeBaseObject, ldap.NeverDerefAliases, 0, 0, false,
+			"(objectClass=*)",
+			[]string{"*"},
+			nil,
+		)
+		result, err := l.Search(searchRequest)
+		log.Println(result, err)
 	}
 
 	return l, nil
@@ -63,7 +73,7 @@ func (lc *LDAPClient) Connect(bind bool) (*ldap.Conn, error) {
 
 // Authenticate authenticates the user against the ldap backend.
 func (lc *LDAPClient) Authenticate(username, password string) (bool, map[string]string, error) {
-	entry, err := lc.findUser()
+	entry, err := lc.findUser(username)
 	if err != nil {
 		return false, nil, err
 	}
@@ -122,8 +132,8 @@ func (lc *LDAPClient) GetGroupsOfUser(username string) ([]string, error) {
 }
 
 // 修改密码
-func (lc *LDAPClient) ChnagePassword(username, oldPwd, newPwd string) error {
-	entry, err := lc.findUser()
+func (lc *LDAPClient) ChangePassword(username, oldPwd, newPwd string) error {
+	entry, err := lc.findUser(username)
 	if err != nil {
 		return err
 	}
@@ -140,12 +150,88 @@ func (lc *LDAPClient) ChnagePassword(username, oldPwd, newPwd string) error {
 		return err
 	}
 
-	err = ChangeUserPassword(l, entry.DN, oldPwd, newPwd)
+	err = ldapChangeUserPassword(l, entry.DN, oldPwd, newPwd)
 
 	return err
 }
 
-func (lc *LDAPClient) findUser() (*ldap.Entry, error) {
+// 设置密码
+func (lc *LDAPClient) SetPassword(username, oldPwd, newPwd string) error {
+	// 查找用户
+	entry, err := lc.findUser(username)
+	if err != nil {
+		return err
+	}
+
+	// 创建连接
+	l, err := lc.Connect(false)
+	if err != nil {
+		return err
+	}
+	defer l.Close()
+
+	// 检查密码
+	err = l.Bind(entry.DN, oldPwd)
+	if err != nil {
+		return err
+	}
+
+	// bind with a read only user
+	if lc.BindDN != "" && lc.BindPassword != "" {
+		err := l.Bind(lc.BindDN, lc.BindPassword)
+		if err != nil {
+			log.Printf("error binding as read only user: %+v", err)
+			return err
+		}
+	}
+
+	err = ldapSetUserPassword(l, entry.DN, newPwd)
+	if err != nil {
+		return err
+	}
+
+	return err
+}
+
+// 列出全部用户
+func (lc *LDAPClient) ListUsers(filterOptions ...LDAPSearchRequestOption) ([]*ldap.Entry, error) {
+	l, err := lc.Connect(true)
+	if err != nil {
+		return nil, err
+	}
+	defer l.Close()
+
+	attributes := make([]string, 0, len(lc.Attributes))
+	attributes = append(attributes, lc.Attributes...)
+	if !slices.Contains(attributes, "*") {
+		attributes = append(attributes, "dn")
+	}
+	// Search for the given username
+	searchRequest := ldap.NewSearchRequest(
+		lc.BaseDN,
+		ldap.ScopeWholeSubtree, ldap.NeverDerefAliases, 0, 0, false,
+		fmt.Sprintf(lc.UserFilter, "*"),
+		attributes,
+		nil,
+	)
+	if len(filterOptions) > 0 {
+		for _, option := range filterOptions {
+			option(searchRequest)
+		}
+	}
+
+	sr, err := l.Search(searchRequest)
+	if err != nil {
+		log.Printf("error listing users: %+v", err)
+		return nil, err
+	}
+
+	return sr.Entries, nil
+}
+
+type LDAPSearchRequestOption func(searchRequest *ldap.SearchRequest)
+
+func (lc *LDAPClient) findUser(username string, filterOptions ...LDAPSearchRequestOption) (*ldap.Entry, error) {
 	l, err := lc.Connect(true)
 	if err != nil {
 		return nil, err
@@ -165,6 +251,11 @@ func (lc *LDAPClient) findUser() (*ldap.Entry, error) {
 		attributes,
 		nil,
 	)
+	if len(filterOptions) > 0 {
+		for _, option := range filterOptions {
+			option(searchRequest)
+		}
+	}
 
 	sr, err := l.Search(searchRequest)
 	if err != nil {
@@ -183,23 +274,17 @@ func (lc *LDAPClient) findUser() (*ldap.Entry, error) {
 	return sr.Entries[0], nil
 }
 
+// EncodePwd string to unicode string
 func encodePassword(pwd string) string {
-	pwdQuoted := fmt.Sprintf("\"%s\"", pwd) // Surround with quotes
-
-	utf16 := []uint16{}
-	for _, r := range pwdQuoted {
-		utf16 = append(utf16, uint16(r))
+	utf16 := unicode.UTF16(unicode.LittleEndian, unicode.IgnoreBOM) // 使用小端编码
+	pwdEncoded, err := utf16.NewEncoder().String("\"" + pwd + "\"")
+	if err != nil {
+		return ""
 	}
-	buf := make([]byte, len(utf16)*2)
-	for i, v := range utf16 {
-		binary.LittleEndian.PutUint16(buf[i*2:], v)
-	}
-
-	return string(buf)
-	// return base64.StdEncoding.EncodeToString(buf) // 将 encodePwd 进行 Base64 编码
+	return pwdEncoded
 }
 
-func ChangeUserPassword(ldapConn *ldap.Conn, userDN, oldPassword, newPassword string) error {
+func ldapChangeUserPassword(ldapConn *ldap.Conn, userDN, oldPassword, newPassword string) error {
 	oldPasswordEncoded := encodePassword(oldPassword)
 	newPasswordEncoded := encodePassword(newPassword)
 
@@ -217,7 +302,7 @@ func ChangeUserPassword(ldapConn *ldap.Conn, userDN, oldPassword, newPassword st
 	return nil
 }
 
-func SetUserPassword(ldapConn *ldap.Conn, userDN, password string) error {
+func ldapSetUserPassword(ldapConn *ldap.Conn, userDN, password string) error {
 	passwordEncoded := encodePassword(password)
 
 	// Create modify request
