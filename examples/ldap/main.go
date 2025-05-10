@@ -3,11 +3,13 @@ package main
 import (
 	"flag"
 	"log"
+	"strings"
 )
 
 var addr, baseDN, bindDN, bindPassword, groupFilter, password, newPassword, userFilter, username, certFile, clientCert string
 var list bool
 var skipTLSVerify bool
+var attrs []string
 
 func main() {
 	flag.Parse()
@@ -20,7 +22,7 @@ func main() {
 		BindPassword:       bindPassword,
 		UserFilter:         userFilter,
 		GroupFilter:        groupFilter,
-		Attributes:         []string{"givenName", "sn", "mail", "uid", "accountExpires", "userPrincipalName"},
+		Attributes:         attrs,
 		InsecureSkipVerify: skipTLSVerify,
 	}
 	if err := client.Init(); err != nil {
@@ -79,4 +81,12 @@ func init() {
 	flag.StringVar(&certFile, "cert-file", "", "root cert file")
 	flag.StringVar(&clientCert, "client-cert", "", "client cert file")
 	flag.BoolVar(&skipTLSVerify, "skip-tls-verify", false, "Skip TLS verify")
+	flag.Func("attrs", "Comma-separated list of attributes", func(value string) error {
+		if len(strings.TrimSpace(value)) == 0 {
+			attrs = []string{"givenName", "sn", "mail", "uid", "accountExpires", "userPrincipalName"}
+		} else {
+			attrs = strings.Split(value, ",")
+		}
+		return nil
+	})
 }
