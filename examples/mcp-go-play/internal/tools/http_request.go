@@ -18,7 +18,7 @@ func HTTPRequest() server.ServerTool {
 	}
 }
 
-var httpTool = mcp.NewTool("http_request",
+var httpTool = mcp.NewTool("httpRequest",
 	mcp.WithDescription("Make HTTP requests to external APIs"),
 	mcp.WithString("method",
 		mcp.Required(),

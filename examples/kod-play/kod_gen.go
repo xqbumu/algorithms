@@ -25,4 +25,3 @@ func init() {
 var _ kod.InstanceOf[kod.Main] = (*app)(nil)
 
 // Local stub implementations.
-

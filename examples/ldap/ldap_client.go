@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"os"
 	"slices"
 
 	"github.com/go-ldap/ldap/v3"
@@ -15,16 +16,37 @@ import (
 )
 
 type LDAPClient struct {
-	Addr               string            `yaml:"addr" json:"addr,omitempty"`
-	BaseDN             string            `yaml:"baseDn" json:"base_dn,omitempty"`
-	BindDN             string            `yaml:"bindDn" json:"bind_dn,omitempty"`
-	BindPassword       string            `yaml:"bindPassword" json:"bind_password,omitempty"`
-	UserFilter         string            `yaml:"userFilter" json:"user_filter,omitempty"`   // e.g. "(uid=%s)"
-	GroupFilter        string            `yaml:"groupFilter" json:"group_filter,omitempty"` // e.g. "(memberUid=%s)"
-	Attributes         []string          `yaml:"attributes" json:"attributes,omitempty"`
-	InsecureSkipVerify bool              `yaml:"insecureSkipVerify" json:"insecure_skip_verify,omitempty"`
-	CertPool           *x509.CertPool    `yaml:"certPool" json:"cert_pool,omitempty"`
-	ClientCertificates []tls.Certificate `yaml:"clientCertificates" json:"client_certificates,omitempty"` // Adding client certificates
+	Addr               string   `yaml:"addr" json:"addr,omitempty"`
+	CertFile           string   `yaml:"certFile" json:"cert_file,omitempty"`
+	BaseDN             string   `yaml:"baseDn" json:"base_dn,omitempty"`
+	BindDN             string   `yaml:"bindDn" json:"bind_dn,omitempty"`
+	BindPassword       string   `yaml:"bindPassword" json:"bind_password,omitempty"`
+	UserFilter         string   `yaml:"userFilter" json:"user_filter,omitempty"`   // e.g. "(uid=%s)"
+	GroupFilter        string   `yaml:"groupFilter" json:"group_filter,omitempty"` // e.g. "(memberUid=%s)"
+	Attributes         []string `yaml:"attributes" json:"attributes,omitempty"`
+	InsecureSkipVerify bool     `yaml:"insecureSkipVerify" json:"insecure_skip_verify,omitempty"`
+	certPool           *x509.CertPool
+	clientCertificates []tls.Certificate
+}
+
+func (lc *LDAPClient) Init() error {
+	// 创建证书池
+	certPool := x509.NewCertPool()
+
+	// 读取证书
+	if len(lc.CertFile) > 0 {
+		certPEM, err := os.ReadFile(lc.CertFile)
+		if err != nil {
+			return err
+		}
+		// 将证书添加到池中
+		if ok := certPool.AppendCertsFromPEM(certPEM); !ok {
+			return errors.New("failed to append certificate")
+		}
+	}
+	lc.certPool = certPool
+
+	return nil
 }
 
 // Connect connects to the ldap backend.
@@ -35,11 +57,11 @@ func (lc *LDAPClient) Connect(bind bool) (*ldap.Conn, error) {
 	config := &tls.Config{
 		InsecureSkipVerify: lc.InsecureSkipVerify,
 	}
-	if lc.CertPool != nil {
-		config.RootCAs = lc.CertPool
+	if lc.certPool != nil {
+		config.RootCAs = lc.certPool
 	}
-	if len(lc.ClientCertificates) > 0 {
-		config.Certificates = lc.ClientCertificates
+	if len(lc.clientCertificates) > 0 {
+		config.Certificates = lc.clientCertificates
 	}
 
 	l, err = ldap.DialURL(lc.Addr, ldap.DialWithTLSConfig(config))

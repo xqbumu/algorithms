@@ -1,7 +1,7 @@
 package prompts
 
 import (
-	"algorithms/examples/mcp/internal/common"
+	"algorithms/examples/mcp-go-play/internal/common"
 	"context"
 	"fmt"
 

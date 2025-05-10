@@ -1,7 +1,7 @@
 package main
 
 import (
-	"algorithms/examples/mcp/internal"
+	"algorithms/examples/mcp-go-play/internal"
 	"flag"
 	"log"
 
@@ -18,9 +18,9 @@ func main() {
 
 	// Only check for "sse" since stdio is the default
 	if transport == "sse" {
-		sseServer := server.NewSSEServer(mcpServer, server.WithBaseURL("http://localhost:8080"))
-		log.Printf("SSE server listening on :8080")
-		if err := sseServer.Start(":8080"); err != nil {
+		sseServer := server.NewSSEServer(mcpServer, server.WithBaseURL("http://localhost:8000"))
+		log.Printf("SSE server listening on :8000")
+		if err := sseServer.Start(":8000"); err != nil {
 			log.Fatalf("Server error: %v", err)
 		}
 	} else {

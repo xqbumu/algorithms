@@ -1,10 +1,8 @@
 package main
 
 import (
-	"crypto/x509"
 	"flag"
 	"log"
-	"os"
 )
 
 var addr, baseDN, bindDN, bindPassword, groupFilter, password, newPassword, userFilter, username, certFile, clientCert string
@@ -14,23 +12,9 @@ var skipTLSVerify bool
 func main() {
 	flag.Parse()
 
-	// 创建证书池
-	certPool := x509.NewCertPool()
-
-	// 读取证书
-	if len(certFile) > 0 {
-		certPEM, err := os.ReadFile(certFile)
-		if err != nil {
-			log.Fatal(err)
-		}
-		// 将证书添加到池中
-		if ok := certPool.AppendCertsFromPEM(certPEM); !ok {
-			log.Fatal("Failed to append certificate")
-		}
-	}
-
 	client := &LDAPClient{
 		Addr:               addr,
+		CertFile:           certFile,
 		BaseDN:             baseDN,
 		BindDN:             bindDN,
 		BindPassword:       bindPassword,
@@ -38,8 +22,9 @@ func main() {
 		GroupFilter:        groupFilter,
 		Attributes:         []string{"givenName", "sn", "mail", "uid", "accountExpires", "userPrincipalName"},
 		InsecureSkipVerify: skipTLSVerify,
-		CertPool:           certPool,
-		ClientCertificates: nil,
+	}
+	if err := client.Init(); err != nil {
+		panic(err)
 	}
 
 	if list {

@@ -1,11 +1,11 @@
 package internal
 
 import (
-	"algorithms/examples/mcp/internal/hooks"
-	"algorithms/examples/mcp/internal/notification"
-	"algorithms/examples/mcp/internal/prompts"
-	"algorithms/examples/mcp/internal/resources"
-	"algorithms/examples/mcp/internal/tools"
+	"algorithms/examples/mcp-go-play/internal/hooks"
+	"algorithms/examples/mcp-go-play/internal/notification"
+	"algorithms/examples/mcp-go-play/internal/prompts"
+	"algorithms/examples/mcp-go-play/internal/resources"
+	"algorithms/examples/mcp-go-play/internal/tools"
 
 	"github.com/mark3labs/mcp-go/server"
 )
@@ -35,6 +35,7 @@ func NewMCPServer() *server.MCPServer {
 		tools.LLM(),
 		tools.Long(),
 		tools.Notify(),
+		tools.QueryWeather(),
 		tools.TinyImage(),
 	)
 
