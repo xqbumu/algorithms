@@ -9,7 +9,7 @@ import (
 var addr, baseDN, bindDN, bindPassword, groupFilter, password, newPassword, userFilter, username, certFile, clientCert string
 var list bool
 var skipTLSVerify bool
-var attrs []string
+var attrs []string = []string{"givenName", "sn", "mail", "uid", "accountExpires", "userPrincipalName"}
 
 func main() {
 	flag.Parse()
@@ -82,9 +82,7 @@ func init() {
 	flag.StringVar(&clientCert, "client-cert", "", "client cert file")
 	flag.BoolVar(&skipTLSVerify, "skip-tls-verify", false, "Skip TLS verify")
 	flag.Func("attrs", "Comma-separated list of attributes", func(value string) error {
-		if len(strings.TrimSpace(value)) == 0 {
-			attrs = []string{"givenName", "sn", "mail", "uid", "accountExpires", "userPrincipalName"}
-		} else {
+		if len(strings.TrimSpace(value)) > 0 {
 			attrs = strings.Split(value, ",")
 		}
 		return nil
